@@ -38,7 +38,7 @@ python mes_automation.py --config config.yaml --no-telegram
 
 `config.yaml`에서 아래 항목을 수정하세요.
 
-- `mes.dry_run: false` 로 변경하면 라이브 수집 모드 시도
+- `mes.dry_run: false` (기본값)로 두고 `export_file` 경로를 넣어 실제 데이터 사용
 - MES 계정/URL/라인/선택자
 - 텔레그램 `bot_token`, `chat_id`
 - 대시보드 분할 라인(`first_image_lines`, `second_image_lines`)

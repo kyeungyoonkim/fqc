@@ -204,7 +204,9 @@ def collect_mes(cfg: dict[str, Any], days: list[dt.date]) -> list[MetricRecord]:
         logging.info("Using MES export files for live metrics")
         return export_records
     if cfg["mes"].get("dry_run", True):
-        logging.info("dry_run=true, generating sample values")
+        logging.warning(
+            "dry_run=true and no export_file data found. Generating dummy sample values."
+        )
         return collect_dry_run(cfg, days)
     if sync_playwright is None:
         raise RuntimeError("Playwright not available. Run: pip install -r requirements.txt && playwright install")

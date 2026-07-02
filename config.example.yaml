@@ -45,8 +45,9 @@ targets:
   JC:J03: 0.80
 
 mes:
-  # For first local test, keep dry_run=true to generate sample data.
-  dry_run: true
+  # false: use MES export_file data (recommended)
+  # true: generate sample dummy values
+  dry_run: false
 
   ctv:
     enabled: true
