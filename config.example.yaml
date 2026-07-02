@@ -1,0 +1,100 @@
+timezone: "Asia/Seoul"
+output_dir: "output"
+
+telegram:
+  enabled: false
+  bot_token: "REPLACE_ME"
+  # Invite link is not chat_id. Use negative group id, e.g. -1001234567890
+  chat_id: "REPLACE_ME"
+  message_template: |
+    Daily FQC ({{start_date}} ~ {{end_date}})
+    - CTV: R1,R2,R3
+    - DLT: E1~E7
+    - JC: J03
+
+rolling_window_days: 7
+
+dashboard:
+  # 2 images split (same pattern as your current screenshots)
+  first_image_lines:
+    - CTV:R1
+    - CTV:R2
+    - CTV:R3
+    - DLT:E6
+    - DLT:E7
+  second_image_lines:
+    - DLT:E1
+    - DLT:E2
+    - DLT:E3
+    - DLT:E4
+    - DLT:E5
+    - JC:J03
+
+targets:
+  # optional: line-specific "last year avg." baseline
+  CTV:R1: 0.70
+  CTV:R2: 0.70
+  CTV:R3: 0.70
+  DLT:E1: 0.90
+  DLT:E2: 0.90
+  DLT:E3: 0.90
+  DLT:E4: 0.90
+  DLT:E5: 1.00
+  DLT:E6: 1.20
+  DLT:E7: 1.20
+  JC:J03: 0.80
+
+mes:
+  # For first local test, keep dry_run=true to generate sample data.
+  dry_run: true
+
+  ctv:
+    enabled: true
+    base_url: "http://10.204.41.132"
+    login_url: "http://10.204.41.132/iam/login"
+    username: "REPLACE_ME"
+    password: "REPLACE_ME"
+    lines: ["R1", "R2", "R3"]
+    # You can change selectors after inspecting real page DOM.
+    selectors:
+      username_input: 'input[name="username"]'
+      password_input: 'input[name="password"]'
+      login_button: 'button[type="submit"]'
+      start_date_input: 'input[placeholder*="From"], input[name*="from"]'
+      end_date_input: 'input[placeholder*="To"], input[name*="to"]'
+      line_input: 'input[name*="line"], input[placeholder*="Line"]'
+      search_button: 'button:has-text("Search"), button:has-text("조회")'
+      export_button: 'button:has-text("Excel"), button:has-text("엑셀")'
+      table_rows: 'table tbody tr'
+
+  dlt:
+    enabled: true
+    vpn:
+      type: "forticlient"
+      profile: "Qcells"
+      duo_required: true
+    base_url: "http://10.60.110.42"
+    login_url: "http://10.60.110.42/emiplus/login"
+    username: "REPLACE_ME"
+    password: "REPLACE_ME"
+    lines: ["E1", "E2", "E3", "E4", "E5", "E6", "E7"]
+    selectors:
+      username_input: 'input[name="username"]'
+      password_input: 'input[name="password"]'
+      login_button: 'button[type="submit"]'
+      start_date_input: 'input[placeholder*="From"], input[name*="from"]'
+      end_date_input: 'input[placeholder*="To"], input[name*="to"]'
+      line_input: 'input[name*="line"], input[placeholder*="Line"]'
+      search_button: 'button:has-text("Search"), button:has-text("조회")'
+      export_button: 'button:has-text("Excel"), button:has-text("엑셀")'
+      table_rows: 'table tbody tr'
+
+  jc:
+    enabled: true
+    vpn:
+      type: "anyconnect"
+      duo_required: true
+    lines: ["J03"]
+    # Desktop app automation is environment-specific.
+    # For now use CSV fallback or later pywinauto flow.
+    data_source_csv: ""

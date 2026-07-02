@@ -1,0 +1,5 @@
+.venv/
+output/
+config.yaml
+__pycache__/
+*.pyc
