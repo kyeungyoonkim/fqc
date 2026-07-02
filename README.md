@@ -61,6 +61,7 @@ mes:
 
 `require_grade_total: true` 이면 **Grade = TOTAL 행만** 사용합니다 (CTV 요청사항 반영).
 `export_file`에 `{line}`을 쓰면 라인별 파일을 각각 읽습니다.
+매트릭스 형태 export(날짜가 열인 형식)는 **한 파일이 한 라인**이어야 정확합니다.
 
 ## 텔레그램 그룹 설정
 

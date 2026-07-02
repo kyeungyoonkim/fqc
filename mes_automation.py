@@ -151,6 +151,13 @@ def _parse_matrix_export(
     days: list[dt.date],
     require_grade_total: bool,
 ) -> list[MetricRecord]:
+    if len(lines) != 1:
+        raise RuntimeError(
+            f"{site_name} matrix export needs exactly one target line per file. "
+            f"Current lines={lines}. Use export_file with '{{line}}' placeholder, "
+            f"for example: C:/Downloads/CTV_{{line}}.xlsx"
+        )
+
     grade_col = _find_column(df, ["Grade", "grade"])
     loss_col = _find_column(df, ["Loss Desc", "Loss Code", "Defect Code", "LossDesc", "loss_desc"])
     if loss_col is None:
@@ -173,11 +180,6 @@ def _parse_matrix_export(
     if input_row is None:
         raise RuntimeError(f"{site_name} matrix parse failed: Input Qty row not found")
 
-    if not lines:
-        raise RuntimeError(f"{site_name} lines config is empty")
-
-    # Matrix export commonly contains one selected line per file.
-    # Use first configured line unless caller provided one line only.
     target_line = lines[0]
     records: list[MetricRecord] = []
     for col_name, day in date_columns:
