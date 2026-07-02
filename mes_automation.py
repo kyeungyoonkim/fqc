@@ -6,7 +6,6 @@ import datetime as dt
 import logging
 import math
 import random
-from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -81,7 +80,129 @@ def collect_dry_run(cfg: dict[str, Any], days: list[dt.date]) -> list[MetricReco
     return records
 
 
+def _read_table_file(path: Path) -> pd.DataFrame:
+    if path.suffix.lower() == ".csv":
+        return pd.read_csv(path)
+    return pd.read_excel(path)
+
+
+def _find_column(df: pd.DataFrame, candidates: list[str]) -> str | None:
+    normalized = {str(c).strip().lower(): c for c in df.columns}
+    for name in candidates:
+        key = name.strip().lower()
+        if key in normalized:
+            return normalized[key]
+    return None
+
+
+def _parse_percent(value: Any) -> float:
+    if pd.isna(value):
+        return 0.0
+    text = str(value).strip().replace("%", "")
+    if text == "":
+        return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        return 0.0
+
+
+def _build_metrics_from_export(
+    df: pd.DataFrame,
+    *,
+    site_name: str,
+    lines: list[str],
+    days: list[dt.date],
+    require_grade_total: bool,
+) -> list[MetricRecord]:
+    date_col = _find_column(df, ["Work Date", "Date", "work_date"])
+    line_col = _find_column(df, ["Line", "line"])
+    grade_col = _find_column(df, ["Grade", "grade"])
+    loss_col = _find_column(df, ["Loss Desc", "Loss Code", "Defect Code", "LossDesc", "loss_desc"])
+    rate_col = _find_column(df, ["Defect Rate", "Rate", "Loss Rate", "loss_rate", "defect_rate"])
+
+    required = {
+        "date": date_col,
+        "line": line_col,
+        "loss": loss_col,
+        "rate": rate_col,
+    }
+    missing = [k for k, v in required.items() if v is None]
+    if missing:
+        raise RuntimeError(
+            f"{site_name} export parse failed. Missing columns: {missing}. "
+            f"Available columns: {list(df.columns)}"
+        )
+
+    work = df.copy()
+    work[date_col] = pd.to_datetime(work[date_col], errors="coerce").dt.date
+    work = work[work[date_col].isin(days)]
+    work = work[work[line_col].astype(str).str.strip().isin(lines)]
+
+    if require_grade_total and grade_col:
+        work = work[work[grade_col].astype(str).str.upper().str.strip() == "TOTAL"]
+
+    work["loss_norm"] = work[loss_col].astype(str).str.upper().str.strip()
+    work["rate_num"] = work[rate_col].map(_parse_percent)
+
+    records: list[MetricRecord] = []
+    for line in lines:
+        for day in days:
+            subset = work[(work[line_col].astype(str).str.strip() == line) & (work[date_col] == day)]
+            if subset.empty:
+                records.append(MetricRecord(site_name, line, day, 0.0, 0.0, 0.0, 0.0))
+                continue
+
+            e03 = subset[subset["loss_norm"].str.contains("E03", na=False)]["rate_num"].sum()
+            e19 = subset[subset["loss_norm"].str.contains("E19", na=False)]["rate_num"].sum()
+            t11 = subset[subset["loss_norm"].str.contains("T11", na=False)]["rate_num"].sum()
+            total_rows = subset[subset["loss_norm"].str.contains("TOTAL", na=False)]["rate_num"]
+            total = float(total_rows.iloc[0]) if not total_rows.empty else e03 + e19 + t11
+
+            records.append(
+                MetricRecord(
+                    site=site_name,
+                    line=line,
+                    date=day,
+                    e03=round(float(e03), 2),
+                    e19=round(float(e19), 2),
+                    t11=round(float(t11), 2),
+                    total=round(float(total), 2),
+                )
+            )
+    return records
+
+
+def collect_from_export_files(cfg: dict[str, Any], days: list[dt.date]) -> list[MetricRecord]:
+    records: list[MetricRecord] = []
+    for site in ("ctv", "dlt", "jc"):
+        site_cfg = cfg["mes"].get(site, {})
+        if not site_cfg.get("enabled", False):
+            continue
+        export_path = site_cfg.get("export_file", "").strip()
+        if not export_path:
+            continue
+        file_path = Path(export_path)
+        if not file_path.exists():
+            raise RuntimeError(f"{site.upper()} export_file not found: {file_path}")
+        data = _read_table_file(file_path)
+        records.extend(
+            _build_metrics_from_export(
+                data,
+                site_name=site.upper(),
+                lines=site_cfg.get("lines", []),
+                days=days,
+                require_grade_total=bool(site_cfg.get("require_grade_total", False)),
+            )
+        )
+    return records
+
+
 def collect_mes(cfg: dict[str, Any], days: list[dt.date]) -> list[MetricRecord]:
+    export_records = collect_from_export_files(cfg, days)
+    if export_records:
+        logging.info("Using MES export files for live metrics")
+        return export_records
     if cfg["mes"].get("dry_run", True):
         logging.info("dry_run=true, generating sample values")
         return collect_dry_run(cfg, days)

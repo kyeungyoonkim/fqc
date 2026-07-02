@@ -43,6 +43,24 @@ python mes_automation.py --config config.yaml --no-telegram
 - 텔레그램 `bot_token`, `chat_id`
 - 대시보드 분할 라인(`first_image_lines`, `second_image_lines`)
 
+### Excel export 기반 정확 매칭(권장 1차)
+
+CTV/DLT에서 `Search` 후 `Excel` 버튼으로 저장한 파일을 바로 읽어 집계할 수 있습니다.
+
+`config.yaml` 예시:
+
+```yaml
+mes:
+  dry_run: false
+  ctv:
+    enabled: true
+    export_file: "C:/Users/<you>/Downloads/ctv_daily_fqc.xlsx"
+    require_grade_total: true
+    lines: ["R1", "R2", "R3"]
+```
+
+`require_grade_total: true` 이면 **Grade = TOTAL 행만** 사용합니다 (CTV 요청사항 반영).
+
 ## 텔레그램 그룹 설정
 
 중요: 그룹 초대 링크(`https://t.me/+...`)는 Bot API의 `chat_id`가 아닙니다.

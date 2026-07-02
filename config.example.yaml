@@ -50,6 +50,11 @@ mes:
 
   ctv:
     enabled: true
+    # If you manually click MES "Excel" and save the file, set this path.
+    # When set, parser reads this file first and ignores dry-run for CTV.
+    export_file: ""
+    # CTV numbers should be taken only from Grade == TOTAL rows.
+    require_grade_total: true
     base_url: "http://10.204.41.132"
     login_url: "http://10.204.41.132/iam/login"
     username: "REPLACE_ME"
@@ -69,6 +74,8 @@ mes:
 
   dlt:
     enabled: true
+    export_file: ""
+    require_grade_total: false
     vpn:
       type: "forticlient"
       profile: "Qcells"
@@ -91,6 +98,8 @@ mes:
 
   jc:
     enabled: true
+    export_file: ""
+    require_grade_total: false
     vpn:
       type: "anyconnect"
       duo_required: true
