@@ -53,6 +53,8 @@ mes:
     enabled: true
     # If you manually click MES "Excel" and save the file, set this path.
     # When set, parser reads this file first and ignores dry-run for CTV.
+    # If each line has separate file, use placeholder:
+    # "C:/path/CTV_{line}.xlsx" -> CTV_R1.xlsx, CTV_R2.xlsx, CTV_R3.xlsx
     export_file: ""
     # CTV numbers should be taken only from Grade == TOTAL rows.
     require_grade_total: true

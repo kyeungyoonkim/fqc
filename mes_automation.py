@@ -107,6 +107,113 @@ def _parse_percent(value: Any) -> float:
         return 0.0
 
 
+def _rate_from_cell(value: Any) -> float:
+    """
+    Convert Excel rate cell into percent number.
+    Supports:
+    - "0.61%" -> 0.61
+    - 0.61    -> 0.61
+    - 0.0061  -> 0.61 (Excel percent numeric form)
+    """
+    if pd.isna(value):
+        return 0.0
+    text = str(value).strip()
+    if "%" in text:
+        return _parse_percent(text)
+    num = _parse_percent(value)
+    if 0 < num < 0.2:
+        return round(num * 100.0, 4)
+    return num
+
+
+def _detect_date_columns(df: pd.DataFrame) -> list[tuple[str, dt.date]]:
+    date_columns: list[tuple[str, dt.date]] = []
+    for col in df.columns:
+        parsed = pd.to_datetime(col, errors="coerce")
+        if pd.isna(parsed):
+            continue
+        date_columns.append((col, parsed.date()))
+    return date_columns
+
+
+def _find_loss_row(work: pd.DataFrame, loss_col: str, token: str) -> pd.Series | None:
+    rows = work[work[loss_col].astype(str).str.upper().str.contains(token, na=False)]
+    if rows.empty:
+        return None
+    return rows.iloc[0]
+
+
+def _parse_matrix_export(
+    df: pd.DataFrame,
+    *,
+    site_name: str,
+    lines: list[str],
+    days: list[dt.date],
+    require_grade_total: bool,
+) -> list[MetricRecord]:
+    grade_col = _find_column(df, ["Grade", "grade"])
+    loss_col = _find_column(df, ["Loss Desc", "Loss Code", "Defect Code", "LossDesc", "loss_desc"])
+    if loss_col is None:
+        raise RuntimeError(f"{site_name} matrix parse failed: Loss Desc column not found")
+
+    work = df.copy()
+    if require_grade_total and grade_col:
+        work = work[work[grade_col].astype(str).str.upper().str.strip() == "TOTAL"]
+
+    date_columns = _detect_date_columns(work)
+    if not date_columns:
+        raise RuntimeError(f"{site_name} matrix parse failed: date columns not found")
+
+    input_row = _find_loss_row(work, loss_col, "INPUT QTY")
+    defect_rate_row = _find_loss_row(work, loss_col, "DEFECT RATE")
+    e03_row = _find_loss_row(work, loss_col, "E03")
+    e19_row = _find_loss_row(work, loss_col, "E19")
+    t11_row = _find_loss_row(work, loss_col, "T11")
+
+    if input_row is None:
+        raise RuntimeError(f"{site_name} matrix parse failed: Input Qty row not found")
+
+    if not lines:
+        raise RuntimeError(f"{site_name} lines config is empty")
+
+    # Matrix export commonly contains one selected line per file.
+    # Use first configured line unless caller provided one line only.
+    target_line = lines[0]
+    records: list[MetricRecord] = []
+    for col_name, day in date_columns:
+        if day not in days:
+            continue
+        input_qty = _parse_percent(input_row.get(col_name, 0))
+        e03_qty = _parse_percent(e03_row.get(col_name, 0)) if e03_row is not None else 0.0
+        e19_qty = _parse_percent(e19_row.get(col_name, 0)) if e19_row is not None else 0.0
+        t11_qty = _parse_percent(t11_row.get(col_name, 0)) if t11_row is not None else 0.0
+
+        if input_qty > 0:
+            e03_rate = (e03_qty / input_qty) * 100.0
+            e19_rate = (e19_qty / input_qty) * 100.0
+            t11_rate = (t11_qty / input_qty) * 100.0
+        else:
+            e03_rate = e19_rate = t11_rate = 0.0
+
+        if defect_rate_row is not None:
+            total_rate = _rate_from_cell(defect_rate_row.get(col_name, 0))
+        else:
+            total_rate = e03_rate + e19_rate + t11_rate
+
+        records.append(
+            MetricRecord(
+                site=site_name,
+                line=target_line,
+                date=day,
+                e03=round(e03_rate, 2),
+                e19=round(e19_rate, 2),
+                t11=round(t11_rate, 2),
+                total=round(total_rate, 2),
+            )
+        )
+    return records
+
+
 def _build_metrics_from_export(
     df: pd.DataFrame,
     *,
@@ -127,11 +234,19 @@ def _build_metrics_from_export(
         "loss": loss_col,
         "rate": rate_col,
     }
-    missing = [k for k, v in required.items() if v is None]
+    missing = [k for k, v in required.items() if v is None and k in ("date", "line", "loss", "rate")]
     if missing:
-        raise RuntimeError(
-            f"{site_name} export parse failed. Missing columns: {missing}. "
-            f"Available columns: {list(df.columns)}"
+        logging.info(
+            "%s export appears matrix-style (date columns). Switching parser. Columns=%s",
+            site_name,
+            list(df.columns),
+        )
+        return _parse_matrix_export(
+            df,
+            site_name=site_name,
+            lines=lines,
+            days=days,
+            require_grade_total=require_grade_total,
         )
 
     work = df.copy()
@@ -182,19 +297,36 @@ def collect_from_export_files(cfg: dict[str, Any], days: list[dt.date]) -> list[
         export_path = site_cfg.get("export_file", "").strip()
         if not export_path:
             continue
-        file_path = Path(export_path)
-        if not file_path.exists():
-            raise RuntimeError(f"{site.upper()} export_file not found: {file_path}")
-        data = _read_table_file(file_path)
-        records.extend(
-            _build_metrics_from_export(
-                data,
-                site_name=site.upper(),
-                lines=site_cfg.get("lines", []),
-                days=days,
-                require_grade_total=bool(site_cfg.get("require_grade_total", False)),
+        line_list = site_cfg.get("lines", [])
+        if "{line}" in export_path:
+            for line in line_list:
+                file_path = Path(export_path.format(line=line))
+                if not file_path.exists():
+                    raise RuntimeError(f"{site.upper()} export_file not found: {file_path}")
+                data = _read_table_file(file_path)
+                records.extend(
+                    _build_metrics_from_export(
+                        data,
+                        site_name=site.upper(),
+                        lines=[line],
+                        days=days,
+                        require_grade_total=bool(site_cfg.get("require_grade_total", False)),
+                    )
+                )
+        else:
+            file_path = Path(export_path)
+            if not file_path.exists():
+                raise RuntimeError(f"{site.upper()} export_file not found: {file_path}")
+            data = _read_table_file(file_path)
+            records.extend(
+                _build_metrics_from_export(
+                    data,
+                    site_name=site.upper(),
+                    lines=line_list,
+                    days=days,
+                    require_grade_total=bool(site_cfg.get("require_grade_total", False)),
+                )
             )
-        )
     return records
 
 

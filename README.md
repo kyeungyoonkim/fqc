@@ -54,12 +54,13 @@ mes:
   dry_run: false
   ctv:
     enabled: true
-    export_file: "C:/Users/<you>/Downloads/ctv_daily_fqc.xlsx"
+    export_file: "C:/Users/<you>/Downloads/CTV_{line}.xlsx"
     require_grade_total: true
     lines: ["R1", "R2", "R3"]
 ```
 
 `require_grade_total: true` 이면 **Grade = TOTAL 행만** 사용합니다 (CTV 요청사항 반영).
+`export_file`에 `{line}`을 쓰면 라인별 파일을 각각 읽습니다.
 
 ## 텔레그램 그룹 설정
 
