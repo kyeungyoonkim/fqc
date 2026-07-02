@@ -1,0 +1,6 @@
+# Optional extra dependency, only needed if you run the automation on a
+# Windows (or macOS) machine that has a real Excel installation and you
+# want chart_export.py to grab a screenshot of the actual Excel dashboard
+# via the Excel COM API instead of (or in addition to) the LibreOffice
+# fallback.
+xlwings>=0.31.4

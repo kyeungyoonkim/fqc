@@ -1,0 +1,162 @@
+# ---------------------------------------------------------------------------
+# MES Daily FQC automation configuration
+# ---------------------------------------------------------------------------
+# Copy this file to `config.yaml` and fill in the real values for your three
+# MES systems (CTV, DLT, JC). Nothing in this file needs to be "correct
+# Python" - it is just data that `src/scraper.py` reads to know how to log
+# in and where to find the numbers on each page.
+#
+# The selectors below are written as CSS selectors by default
+# (`selector_type: css`). If a value is easier to grab with an XPath
+# expression, set `selector_type: xpath` for that entry instead.
+# ---------------------------------------------------------------------------
+
+sites:
+  CTV:
+    enabled: true
+    requires_vpn: false
+    base_url: "https://ctv-mes.example.com"
+    login:
+      url: "https://ctv-mes.example.com/login"
+      username_selector: "#userId"
+      password_selector: "#password"
+      submit_selector: "#loginBtn"
+      # env var names that hold the actual credentials (see .env.example)
+      username_env: "CTV_USERNAME"
+      password_env: "CTV_PASSWORD"
+      # A selector that only appears once you are logged in successfully.
+      # Used so the script can wait for/confirm a successful login.
+      success_selector: "#gnbUserMenu"
+    fqc_page:
+      # Direct URL if the Daily FQC page has one, otherwise leave blank and
+      # use `navigation_steps` (a list of selectors to click in order) to
+      # reach the page starting from the post-login landing page.
+      url: "https://ctv-mes.example.com/quality/dailyFqc"
+      navigation_steps: []
+      wait_for_selector: "#fqcTable"
+    metrics:
+      # `selector` should point to the DOM node containing the raw text,
+      # e.g. "1.23%" or "1.23". `regex` optionally extracts just the number.
+      E03:
+        selector: "#fqcTable [data-line='E03'] .defect-rate"
+        selector_type: css
+        regex: "([0-9.]+)"
+      E19:
+        selector: "#fqcTable [data-line='E19'] .defect-rate"
+        selector_type: css
+        regex: "([0-9.]+)"
+      T11:
+        selector: "#fqcTable [data-line='T11'] .defect-rate"
+        selector_type: css
+        regex: "([0-9.]+)"
+      OVERALL:
+        selector: "#fqcTable .total-defect-rate"
+        selector_type: css
+        regex: "([0-9.]+)"
+
+  DLT:
+    enabled: true
+    requires_vpn: true
+    base_url: "https://dlt-mes.example.com"
+    login:
+      url: "https://dlt-mes.example.com/login"
+      username_selector: "#loginId"
+      password_selector: "#loginPw"
+      submit_selector: "button[type='submit']"
+      username_env: "DLT_USERNAME"
+      password_env: "DLT_PASSWORD"
+      success_selector: ".main-dashboard"
+    fqc_page:
+      url: "https://dlt-mes.example.com/fqc/daily"
+      navigation_steps: []
+      wait_for_selector: "table.fqc-summary"
+    metrics:
+      E03:
+        selector: "//table[@class='fqc-summary']//tr[@data-line='E03']/td[last()]"
+        selector_type: xpath
+        regex: "([0-9.]+)"
+      E19:
+        selector: "//table[@class='fqc-summary']//tr[@data-line='E19']/td[last()]"
+        selector_type: xpath
+        regex: "([0-9.]+)"
+      T11:
+        selector: "//table[@class='fqc-summary']//tr[@data-line='T11']/td[last()]"
+        selector_type: xpath
+        regex: "([0-9.]+)"
+      OVERALL:
+        selector: "//tfoot//td[@class='total-rate']"
+        selector_type: xpath
+        regex: "([0-9.]+)"
+
+  JC:
+    enabled: true
+    requires_vpn: true
+    base_url: "https://jc-mes.example.com"
+    login:
+      url: "https://jc-mes.example.com/auth/login"
+      username_selector: "#username"
+      password_selector: "#password"
+      submit_selector: "#btnLogin"
+      username_env: "JC_USERNAME"
+      password_env: "JC_PASSWORD"
+      success_selector: "#logoutBtn"
+    fqc_page:
+      url: "https://jc-mes.example.com/quality/dailyFqc.do"
+      navigation_steps: []
+      wait_for_selector: "#dailyFqcGrid"
+    metrics:
+      E03:
+        selector: "#dailyFqcGrid [data-code='E03'] .rate"
+        selector_type: css
+        regex: "([0-9.]+)"
+      E19:
+        selector: "#dailyFqcGrid [data-code='E19'] .rate"
+        selector_type: css
+        regex: "([0-9.]+)"
+      T11:
+        selector: "#dailyFqcGrid [data-code='T11'] .rate"
+        selector_type: css
+        regex: "([0-9.]+)"
+      OVERALL:
+        selector: "#dailyFqcGrid .overall-rate"
+        selector_type: css
+        regex: "([0-9.]+)"
+
+excel:
+  # Path to your existing tracking workbook (with the chart already built
+  # on it). The writer only ever *adds a new row*, so your chart/pivot can
+  # keep referencing the data range/table as long as it auto-expands
+  # (recommended: turn the data range into an Excel Table).
+  path: "C:/Users/you/Documents/Daily_FQC_Tracking.xlsx"
+  sheet_name: "Data"
+  # Optional: name of the Excel Table (ListObject) that holds the data, if
+  # you used Insert > Table. Leave blank to just append after the last row.
+  table_name: "FQC_Data"
+  date_column_header: "Date"
+  # Maps a "SITE_METRIC" key to the exact column header text in row 1 of
+  # the sheet. Edit these to match your real spreadsheet headers.
+  column_headers:
+    CTV_E03: "CTV E03"
+    CTV_E19: "CTV E19"
+    CTV_T11: "CTV T11"
+    CTV_OVERALL: "CTV 전체"
+    DLT_E03: "DLT E03"
+    DLT_E19: "DLT E19"
+    DLT_T11: "DLT T11"
+    DLT_OVERALL: "DLT 전체"
+    JC_E03: "JC E03"
+    JC_E19: "JC E19"
+    JC_T11: "JC T11"
+    JC_OVERALL: "JC 전체"
+  # Name of the sheet that contains the chart/dashboard you screenshot
+  # today. Used by chart_export.py.
+  dashboard_sheet_name: "Dashboard"
+
+telegram:
+  bot_token_env: "TELEGRAM_BOT_TOKEN"
+  chat_id_env: "TELEGRAM_CHAT_ID"
+  caption_template: "📊 Daily FQC Report - {date}\nCTV/DLT/JC E03·E19·T11 & 전체 불량률"
+
+output:
+  chart_image_path: "./output/daily_fqc_dashboard.png"
+  log_dir: "./output/logs"
