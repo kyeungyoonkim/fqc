@@ -14,6 +14,11 @@ telegram:
 
 rolling_window_days: 7
 
+browser:
+  # Set true once selectors are confirmed. Keep false to watch it work / approve DUO.
+  headless: false
+  timeout_ms: 60000
+
 dashboard:
   # 2 images split (same pattern as your current screenshots)
   first_image_lines:
@@ -60,9 +65,17 @@ mes:
     require_grade_total: true
     base_url: "http://10.204.41.132"
     login_url: "http://10.204.41.132/iam/login"
+    # URL of the Daily FQC Result (R) page, if it can be opened directly.
+    daily_fqc_url: ""
     username: "REPLACE_ME"
     password: "REPLACE_ME"
     lines: ["R1", "R2", "R3"]
+    # Date text format typed into the Work Date fields.
+    date_format: "%Y-%m-%d"
+    login:
+      # true: log in by hand in the opened browser (handles DUO), then press Enter.
+      manual: true
+      duo_required: false
     # You can change selectors after inspecting real page DOM.
     selectors:
       username_input: 'input[name="username"]'

@@ -438,10 +438,24 @@ def render_dashboard(df: pd.DataFrame, line_keys: list[str], targets: dict[str, 
     plt.close(fig)
 
 
+def _telegram_check(resp: requests.Response, action: str) -> None:
+    try:
+        payload = resp.json()
+    except ValueError:
+        payload = {}
+    if not resp.ok or not payload.get("ok", False):
+        desc = payload.get("description", resp.text)
+        raise RuntimeError(
+            f"Telegram {action} failed (HTTP {resp.status_code}): {desc}. "
+            f"Check bot_token and chat_id. For groups, chat_id must be like -100xxxxxxxxxx "
+            f"and the bot must be a member."
+        )
+
+
 def send_telegram(bot_token: str, chat_id: str, message: str, images: list[Path]) -> None:
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     resp = requests.post(url, data={"chat_id": chat_id, "text": message}, timeout=20)
-    resp.raise_for_status()
+    _telegram_check(resp, "sendMessage")
     for image in images:
         with image.open("rb") as f:
             purl = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
@@ -449,9 +463,27 @@ def send_telegram(bot_token: str, chat_id: str, message: str, images: list[Path]
                 purl,
                 data={"chat_id": chat_id, "caption": image.name},
                 files={"photo": f},
-                timeout=30,
+                timeout=60,
             )
-            presp.raise_for_status()
+            _telegram_check(presp, "sendPhoto")
+
+
+def run_telegram_test(cfg: dict[str, Any]) -> None:
+    tg_cfg = cfg.get("telegram", {})
+    token = str(tg_cfg.get("bot_token", "")).strip()
+    chat_id = str(tg_cfg.get("chat_id", "")).strip()
+    if not token or token == "REPLACE_ME":
+        raise RuntimeError("telegram.bot_token is not set in config")
+    if not chat_id or chat_id == "REPLACE_ME":
+        raise RuntimeError("telegram.chat_id is not set in config")
+    now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    send_telegram(
+        bot_token=token,
+        chat_id=chat_id,
+        message=f"[FQC bot test] Connection OK at {now}",
+        images=[],
+    )
+    logging.info("Telegram test message sent to chat_id=%s", chat_id)
 
 
 def ensure_dir(path: Path) -> None:
@@ -462,6 +494,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Daily FQC automation")
     parser.add_argument("--config", default="config.yaml", help="Path to config YAML")
     parser.add_argument("--no-telegram", action="store_true", help="Skip telegram send")
+    parser.add_argument("--test-telegram", action="store_true", help="Only send a Telegram test message and exit")
+    parser.add_argument("--auto-export", action="store_true", help="Run browser automation to download MES exports first")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -469,8 +503,20 @@ def main() -> None:
     out_dir = Path(cfg.get("output_dir", "output"))
     ensure_dir(out_dir)
 
+    if args.test_telegram:
+        run_telegram_test(cfg)
+        return
+
     start, end, days = rolling_date_range(int(cfg.get("rolling_window_days", 7)))
     logging.info("Collecting Daily FQC: %s ~ %s", start, end)
+
+    if args.auto_export:
+        if cfg["mes"].get("ctv", {}).get("enabled", False):
+            from ctv_collector import collect_ctv_exports
+
+            logging.info("Auto-export: downloading CTV MES files via browser")
+            collect_ctv_exports(cfg, start, end)
+
     records = collect_mes(cfg, days)
     df = records_to_dataframe(records)
 

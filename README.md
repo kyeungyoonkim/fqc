@@ -14,7 +14,8 @@ MES Daily FQC를 7일 rolling(어제 포함 최근 7일)으로 수집하고,
   - `output/daily_fqc_*.xlsx`
   - `output/dashboard_1_*.png`
   - `output/dashboard_2_*.png`
-- 텔레그램 전송(선택)
+- 텔레그램 전송(선택, `--test-telegram`로 연결 테스트 가능)
+- CTV 브라우저 자동 수집(`--auto-export`, Playwright)
 
 ## 현재 상태
 
@@ -77,6 +78,46 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates"
 ```
 
 응답 JSON의 `chat.id` (보통 `-100...`)를 `config.yaml`의 `telegram.chat_id`에 입력하세요.
+
+### 텔레그램 연결 테스트
+
+`config.yaml`에 `telegram.bot_token`, `telegram.chat_id`를 넣은 뒤:
+
+```bash
+python mes_automation.py --config config.yaml --test-telegram
+```
+
+성공하면 해당 채팅으로 `[FQC bot test] Connection OK ...` 메시지가 갑니다.
+개인 DM으로 먼저 테스트하려면 `chat_id`에 본인 개인 id(예: `7649433757`)를 넣으세요.
+전체 실행에서 실제 전송을 켜려면 `telegram.enabled: true`로 두고 `--no-telegram` 없이 실행합니다.
+
+## CTV 자동 수집 (브라우저 자동화)
+
+MES에서 R1/R2/R3를 사람이 직접 조회/Excel 저장하지 않고 자동으로 내려받습니다.
+
+1. Playwright 설치:
+
+```bash
+pip install playwright
+python -m playwright install
+```
+
+2. `config.yaml`의 `mes.ctv`에서:
+   - `export_file: "C:/Users/<you>/Downloads/CTV_{line}.xlsx"` (`{line}` 필수)
+   - `daily_fqc_url`: Daily FQC Result (R) 페이지 URL(가능하면)
+   - `login.manual: true` (DUO/2차인증이 있으면 권장: 브라우저에서 직접 로그인 후 Enter)
+   - `selectors`: 실제 화면 DOM에 맞게 조정
+
+3. 실행:
+
+```bash
+python mes_automation.py --config config.yaml --auto-export --no-telegram
+```
+
+동작: 브라우저를 열어 로그인 → 라인별로 Work Date(7일) 입력 → Search → Excel 다운로드 →
+`CTV_R1/R2/R3.xlsx` 저장 → 이후 기존 파서가 그 파일을 읽어 대시보드를 생성합니다.
+`browser.headless: false`면 창이 보여 진행 상황/실패 지점을 확인할 수 있고,
+실패 시 `*.error.png` 스크린샷이 저장됩니다.
 
 ## 스케줄링 (매일 08:00)
 
