@@ -18,6 +18,9 @@ browser:
   # Set true once selectors are confirmed. Keep false to watch it work / approve DUO.
   headless: false
   timeout_ms: 60000
+  # Use a system-installed browser to avoid Chromium download (corporate SSL).
+  # Options: "msedge" (default on Windows), "chrome", or "" to use Playwright Chromium.
+  channel: "msedge"
 
 dashboard:
   # 2 images split (same pattern as your current screenshots)

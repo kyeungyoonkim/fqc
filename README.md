@@ -99,8 +99,18 @@ MES에서 R1/R2/R3를 사람이 직접 조회/Excel 저장하지 않고 자동�
 
 ```bash
 pip install playwright
-python -m playwright install
+python -m playwright install chromium
 ```
+
+회사망 SSL 때문에 `playwright install`이 인증서 오류(`UNABLE_TO_VERIFY_LEAF_SIGNATURE`)로 실패하면,
+Chromium 다운로드 없이 **이미 설치된 Edge/Chrome**를 사용하세요:
+
+```yaml
+browser:
+  channel: "msedge"   # 또는 "chrome"
+```
+
+`channel`이 설정되면 브라우저 바이너리 다운로드가 필요 없습니다.
 
 2. `config.yaml`의 `mes.ctv`에서:
    - `export_file: "C:/Users/<you>/Downloads/CTV_{line}.xlsx"` (`{line}` 필수)

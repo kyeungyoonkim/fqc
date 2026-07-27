@@ -73,10 +73,17 @@ def collect_ctv_exports(cfg: dict[str, Any], start: dt.date, end: dt.date) -> li
     lines = ctv.get("lines", [])
     headless = bool(browser_cfg.get("headless", False))
     nav_timeout = int(browser_cfg.get("timeout_ms", 60000))
+    channel = str(browser_cfg.get("channel", "") or "").strip()
 
     saved: list[Path] = []
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless)
+        launch_kwargs: dict[str, Any] = {"headless": headless}
+        if channel:
+            # Use a system-installed browser (e.g. "msedge" or "chrome")
+            # so no Chromium download is required behind corporate SSL.
+            launch_kwargs["channel"] = channel
+            logging.info("Launching system browser channel: %s", channel)
+        browser = p.chromium.launch(**launch_kwargs)
         context = browser.new_context(accept_downloads=True)
         page = context.new_page()
         page.set_default_timeout(nav_timeout)
